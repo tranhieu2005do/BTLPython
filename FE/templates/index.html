@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Dashboard - Phát hiện Trạng thái Mắt</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="video-section">
+        <img src="/video_feed" id="camera-feed" alt="Camera Feed">
+    </div>
+    <div class="info-section">
+        <h2>📊 Giám sát Trạng thái</h2>
+        
+        <div class="status-info">
+            <p>Trạng thái hiện tại: <span id="eye-status" class="status-badge">Đang phân tích...</span></p>
+            <p>Thời gian chạy: <span id="uptime">00:00:00</span></p>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="statusChart"></canvas>
+        </div>
+
+        <div class="legend-container">
+            <h3>Đánh giá trạng thái</h3>
+            <div class="legend-item alert">
+                <span class="legend-color"></span>
+                <span>Ngủ</span>
+            </div>
+            <div class="legend-item warning">
+                <span class="legend-color"></span>
+                <span>Ngủ gật</span>
+            </div>
+            <div class="legend-item safe">
+                <span class="legend-color"></span>
+                <span>Tỉnh táo</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>
