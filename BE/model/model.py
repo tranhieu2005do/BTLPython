@@ -8,7 +8,7 @@ import os
 
 
 class EyeStateModel:
-    def __init__(self, input_shape=(24, 24, 1)):
+    def __init__(self, input_shape=(101, 101, 1)):
         self.input_shape = input_shape
         self.model = self._build_model()
 
@@ -63,17 +63,12 @@ class EyeStateModel:
         self.model = tf.keras.models.load_model(path)
         print(f"Model loaded from {path}")
 
-    def predict(self, img_path):
-        """Dự đoán trạng thái mắt từ ảnh"""
-        img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-        if img is None:
-            raise ValueError(" Không đọc được ảnh, kiểm tra đường dẫn!")
-
-        img = cv2.resize(img, self.input_shape[:2])
-        img = img / 255.0
-        img = np.expand_dims(img, axis=(0, -1))  # (1, 24, 24, 1)
-
-        prob = self.model.predict(img)[0][0]
+    def predict(self, img):
+        """Dự đoán trạng thái mắt từ ảnh bất kỳ kích thước"""
+        img = np.expand_dims(img, axis=0)
+        # Dự đoán
+        prob = self.model.predict(img)[0, 0]
         label = "Open" if prob > 0.5 else "Closed"
-        print(f" Dự đoán: {label} ({prob:.2f})")
+        
+        print(f"Dự đoán: {label} ({prob:.2f})")
         return label, prob

@@ -1,76 +1,191 @@
 import cv2
 import numpy as np
-import mediapipe as mp
 
 class Preprocessing:
-    def __init__(self, target_size=(24, 24), mode="mediapipe", save_gray=True):
+    def __init__(self, img_size=(101, 101), normalize=True, detect_both_eyes=True):
         """
-        Bộ tiền xử lý ảnh real-time cho phát hiện buồn ngủ.
-        - target_size: kích thước ảnh đầu vào cho model
-        - mode: mediapipe (chính xác cao) hoặc haar (dự phòng)
-        - save_gray: có chuyển ảnh sang grayscale không
+        Bộ tiền xử lý nâng cao cho phát hiện mắt rõ nét.
         """
-        self.target_size = target_size
-        self.mode = mode
-        self.save_gray = save_gray
+        self.img_size = img_size
+        self.normalize = normalize
+        self.detect_both_eyes = detect_both_eyes
 
-        if mode == "mediapipe":
-            self.mp_face_mesh = mp.solutions.face_mesh
-            self.face_mesh = self.mp_face_mesh.FaceMesh(
-                static_image_mode=False,
-                refine_landmarks=True,
-                max_num_faces=1
+        # Bộ phát hiện Haar cascade
+        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        self.eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye_tree_eyeglasses.xml')
+
+    def enhance_image(self, gray):
+        """
+        Cải thiện chất lượng ảnh nhưng giữ nguyên độ nét.
+        """
+        # CLAHE - Cân bằng histogram thích ứng cục bộ (tốt hơn equalizeHist)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        gray = clahe.apply(gray)
+        
+        # Giảm nhiễu nhẹ nhưng giữ cạnh (bilateral filter)
+        gray = cv2.bilateralFilter(gray, d=5, sigmaColor=50, sigmaSpace=50)
+        
+        return gray
+
+    def sharpen_eye(self, eye_img):
+        """
+        Làm sắc nét ảnh mắt sau khi resize.
+        """
+        # Unsharp masking để tăng độ nét
+        gaussian = cv2.GaussianBlur(eye_img, (0, 0), 2.0)
+        sharpened = cv2.addWeighted(eye_img, 1.5, gaussian, -0.5, 0)
+        
+        # Đảm bảo giá trị pixel trong khoảng [0, 255]
+        sharpened = np.clip(sharpened, 0, 255).astype(np.uint8)
+        
+        return sharpened
+
+    def detect_eyes(self, img):
+        """
+        Phát hiện mắt trong ảnh với chất lượng cao nhất.
+        """
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        
+        # Tăng độ phân giải nếu ảnh quá nhỏ
+        h, w = gray.shape
+        if h < 400 or w < 400:
+            scale = max(400 / h, 400 / w)
+            gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+        
+        # Enhance toàn bộ ảnh trước
+        gray_enhanced = self.enhance_image(gray)
+
+        faces = self.face_cascade.detectMultiScale(
+            gray_enhanced, 
+            scaleFactor=1.1, 
+            minNeighbors=5,
+            minSize=(101, 101)
+        )
+        
+        eyes_crops = []
+
+        for (x, y, w, h) in faces:
+            # Tập trung vào nửa trên khuôn mặt (nơi có mắt)
+            face_roi = gray_enhanced[y:y+int(h*0.6), x:x+w]
+
+            eyes = self.eye_cascade.detectMultiScale(
+                face_roi, 
+                scaleFactor=1.05,  # Giảm scale factor để phát hiện chính xác hơn
+                minNeighbors=8,    # Tăng minNeighbors để giảm false positive
+                minSize=(30, 30)
             )
+
+            for (ex, ey, ew, eh) in eyes:
+                # Mở rộng vùng crop để lấy đủ context
+                pad_y, pad_x = int(eh * 0.25), int(ew * 0.25)
+                y1 = max(0, ey - pad_y)
+                y2 = min(face_roi.shape[0], ey + eh + pad_y)
+                x1 = max(0, ex - pad_x)
+                x2 = min(face_roi.shape[1], ex + ew + pad_x)
+
+                eye_roi = face_roi[y1:y2, x1:x2]
+                
+                # Kiểm tra kích thước hợp lệ
+                if eye_roi.shape[0] < 10 or eye_roi.shape[1] < 10:
+                    continue
+
+                # Resize với interpolation tốt nhất
+                # INTER_CUBIC tốt cho downscaling
+                eye_resized = cv2.resize(eye_roi, self.img_size, interpolation=cv2.INTER_CUBIC)
+                
+                # Làm sắc nét sau khi resize
+                eye_resized = self.sharpen_eye(eye_resized)
+                
+                # Chuẩn hóa histogram một lần nữa
+                eye_resized = cv2.equalizeHist(eye_resized)
+
+                if self.normalize:
+                    eye_resized = eye_resized.astype("float32") / 255.0
+
+                eye_resized = np.expand_dims(eye_resized, axis=-1)
+                eyes_crops.append(eye_resized)
+
+        return eyes_crops
+
+    def preprocess_and_visualize(self, img, save_path=None):
+        """
+        Xử lý ảnh:
+        - Trả về 2 mắt đã chuẩn hóa như trước
+        - Vẽ bounding box face và eye lên ảnh gốc, trả về ảnh gốc có khung
+        """
+        # img = cv2.imread(img_path)
+        # if img is None:
+        #     raise ValueError(f"Không đọc được ảnh: {img_path}")
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # Tăng độ phân giải nếu ảnh quá nhỏ
+        h, w = gray.shape
+        scale = 1.0
+        if h < 400 or w < 400:
+            scale = max(400 / h, 400 / w)
+            gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+            img_disp = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
         else:
-            self.face_detector = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-            self.eye_detector = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
+            img_disp = img.copy()
 
-    def _normalize(self, img):
-        img = cv2.resize(img, self.target_size)
-        img = img.astype('float32') / 255.0
-        if len(img.shape) == 2:  # grayscale
-            img = np.expand_dims(img, axis=-1)
-        return img
+        gray_enhanced = self.enhance_image(gray)
+        faces = self.face_cascade.detectMultiScale(
+            gray_enhanced, scaleFactor=1.1, minNeighbors=5, minSize=(101, 101)
+        )
 
-    def _extract_eyes_mediapipe(self, frame):
-        h, w, _ = frame.shape
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        result = self.face_mesh.process(rgb)
-        eyes = []
+        eyes_crops = []
+        for (x, y, w_f, h_f) in faces:
+            # Vẽ khung face
+            cv2.rectangle(img_disp, (x, y), (x + w_f, y + h_f), (0, 255, 0), 2)
 
-        if result.multi_face_landmarks:
-            landmarks = result.multi_face_landmarks[0]
+            face_roi = gray_enhanced[y:y+int(h_f*0.6), x:x+w_f]
+            eyes = self.eye_cascade.detectMultiScale(
+                face_roi,
+                scaleFactor=1.05,
+                minNeighbors=8,
+                minSize=(30, 30)
+            )
 
-            # Mắt trái và phải (theo chỉ số landmark Mediapipe)
-            left_eye_idx = [33, 133, 159, 145]
-            right_eye_idx = [362, 263, 386, 374]
+            for (ex, ey, ew, eh) in eyes:
+                pad_y, pad_x = int(eh * 0.25), int(ew * 0.25)
+                y1 = max(0, ey - pad_y)
+                y2 = min(face_roi.shape[0], ey + eh + pad_y)
+                x1 = max(0, ex - pad_x)
+                x2 = min(face_roi.shape[1], ex + ew + pad_x)
+                eye_roi = face_roi[y1:y2, x1:x2]
 
-            def crop_eye(indices):
-                xs = [int(landmarks.landmark[i].x * w) for i in indices]
-                ys = [int(landmarks.landmark[i].y * h) for i in indices]
-                x1, x2 = max(min(xs) - 5, 0), min(max(xs) + 5, w)
-                y1, y2 = max(min(ys) - 5, 0), min(max(ys) + 5, h)
-                return frame[y1:y2, x1:x2]
+                if eye_roi.shape[0] < 10 or eye_roi.shape[1] < 10:
+                    continue
 
-            left_eye = crop_eye(left_eye_idx)
-            right_eye = crop_eye(right_eye_idx)
+                # Resize và sharpen
+                eye_resized = cv2.resize(eye_roi, self.img_size, interpolation=cv2.INTER_CUBIC)
+                eye_resized = self.sharpen_eye(eye_resized)
+                eye_resized = cv2.equalizeHist(eye_resized)
+                if self.normalize:
+                    eye_resized = eye_resized.astype("float32") / 255.0
+                    eye_resized = np.expand_dims(eye_resized, axis=-1)
 
-            if left_eye.size > 0: eyes.append(left_eye)
-            if right_eye.size > 0: eyes.append(right_eye)
+                eyes_crops.append(eye_resized)
 
-        return eyes
+                # Vẽ khung eye lên ảnh gốc
+                ex_disp = int(x + ex - pad_x)
+                ey_disp = int(y + ey - pad_y)
+                ew_disp = int(ew + 2*pad_x)
+                eh_disp = int(eh + 2*pad_y)
+                cv2.rectangle(img_disp, (ex_disp, ey_disp), (ex_disp + ew_disp, ey_disp + eh_disp), (0, 0, 255), 2)
 
-    def preprocess_frame(self, frame):
-        """
-        Tiền xử lý 1 frame từ camera.
-        Trả về danh sách ảnh mắt đã chuẩn hóa để đưa vào model.
-        """
-        eyes = self._extract_eyes_mediapipe(frame) if self.mode == "mediapipe" else []
+        # Nếu không detect được mắt
+        if not eyes_crops:
+            empty_eye = np.zeros((*self.img_size, 1), dtype=np.float32)
+            eyes_crops = [empty_eye, empty_eye]
+        elif len(eyes_crops) == 1:
+            empty_eye = np.zeros((*self.img_size, 1), dtype=np.float32)
+            eyes_crops = [eyes_crops[0], empty_eye]
+        else:
+            eyes_crops = eyes_crops[:2]
 
-        processed = []
-        for eye in eyes:
-            if self.save_gray:
-                eye = cv2.cvtColor(eye, cv2.COLOR_BGR2GRAY)
-            eye = self._normalize(eye)
-            processed.append(eye)
-        return processed
+        if save_path:
+            cv2.imwrite(save_path, img_disp)
+
+        return img_disp, eyes_crops
