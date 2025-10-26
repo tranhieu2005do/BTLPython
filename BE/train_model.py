@@ -1,4 +1,4 @@
-from model import EyeStateModel
+from utils import EyeStateModel
 
 model = EyeStateModel()
 

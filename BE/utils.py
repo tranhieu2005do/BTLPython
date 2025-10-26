@@ -1,5 +1,76 @@
-import cv2
+import tensorflow as tf
+from tensorflow.keras.models import Sequential  # type: ignore
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout # type: ignore
+from tensorflow.keras.preprocessing.image import ImageDataGenerator # type: ignore
 import numpy as np
+import cv2
+import os
+
+class EyeStateModel:
+    def __init__(self, input_shape=(101, 101, 1)):
+        self.input_shape = input_shape
+        self.model = self._build_model()
+
+    def _build_model(self):
+        """Xây dựng kiến trúc CNN"""
+        model = Sequential([
+            Conv2D(32, (3,3), activation='relu', input_shape=self.input_shape),
+            MaxPooling2D(2,2),
+            Conv2D(64, (3,3), activation='relu'),
+            MaxPooling2D(2,2),
+            Flatten(),
+            Dense(128, activation='relu'),
+            Dropout(0.5),
+            Dense(1, activation='sigmoid')  
+        ])
+
+        model.compile(optimizer='adam',
+                      loss='binary_crossentropy',
+                      metrics=['accuracy'])
+        return model
+
+    def train(self, train_dir, val_dir, batch_size=32, epochs=10):
+        """Huấn luyện model với dữ liệu từ thư mục"""
+        datagen = ImageDataGenerator(rescale=1./255)
+
+        train_gen = datagen.flow_from_directory(
+            train_dir,
+            target_size=self.input_shape[:2],
+            color_mode='grayscale',
+            class_mode='binary',
+            batch_size=batch_size
+        )
+
+        val_gen = datagen.flow_from_directory(
+            val_dir,
+            target_size=self.input_shape[:2],
+            color_mode='grayscale',
+            class_mode='binary',
+            batch_size=batch_size
+        )
+
+        self.model.fit(train_gen, validation_data=val_gen, epochs=epochs)
+        print("Training complete!")
+
+    def save(self, path="eye_model.h5"):
+        """Lưu model"""
+        self.model.save(path)
+        print(f" Model saved to {path}")
+
+    def load(self, path="eye_model.h5"):
+        """Tải model đã huấn luyện"""
+        self.model = tf.keras.models.load_model(path)
+        print(f"Model loaded from {path}")
+
+    def predict(self, img):
+        """Dự đoán trạng thái mắt từ ảnh bất kỳ kích thước"""
+        img = np.expand_dims(img, axis=0)
+        # Dự đoán
+        prob = self.model.predict(img)[0, 0]
+        label = "Open" if prob > 0.5 else "Closed"
+        
+        print(f"Dự đoán: {label} ({prob:.2f})")
+        return label, prob
 
 class Preprocessing:
     def __init__(self, img_size=(101, 101), normalize=True, detect_both_eyes=True):
@@ -10,21 +81,21 @@ class Preprocessing:
         self.normalize = normalize
         self.detect_both_eyes = detect_both_eyes
 
-        # Bộ phát hiện Haar cascade
+        # Tải model nhận diện mặt người của OpenCV
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        # Tải model nhận diện mắt của OpenCV
         self.eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye_tree_eyeglasses.xml')
 
     def enhance_image(self, gray):
         """
         Cải thiện chất lượng ảnh nhưng giữ nguyên độ nét.
         """
-        # CLAHE - Cân bằng histogram thích ứng cục bộ (tốt hơn equalizeHist)
+        # Tăng độ tương phản cục bộ bằng CLAHE (Contrast Limited Adaptive Histogram Equalization)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         gray = clahe.apply(gray)
-        
-        # Giảm nhiễu nhẹ nhưng giữ cạnh (bilateral filter)
+        # Giảm nhiễu nhưng vẫn giữ nét bằng Bilateral Filter
         gray = cv2.bilateralFilter(gray, d=5, sigmaColor=50, sigmaSpace=50)
-        
+
         return gray
 
     def sharpen_eye(self, eye_img):
@@ -55,6 +126,7 @@ class Preprocessing:
         # Enhance toàn bộ ảnh trước
         gray_enhanced = self.enhance_image(gray)
 
+        # Tìm tất cả khuôn mặt trong ảnh
         faces = self.face_cascade.detectMultiScale(
             gray_enhanced, 
             scaleFactor=1.1, 
@@ -65,9 +137,10 @@ class Preprocessing:
         eyes_crops = []
 
         for (x, y, w, h) in faces:
-            # Tập trung vào nửa trên khuôn mặt (nơi có mắt)
+            # Tập trung vào 60% (nửa trên) khuôn mặt (nơi có mắt)
             face_roi = gray_enhanced[y:y+int(h*0.6), x:x+w]
 
+            # Tìm mắt bên trong vùng mặt đã phát hiện
             eyes = self.eye_cascade.detectMultiScale(
                 face_roi, 
                 scaleFactor=1.05,  # Giảm scale factor để phát hiện chính xác hơn
@@ -96,26 +169,24 @@ class Preprocessing:
                 # Làm sắc nét sau khi resize
                 eye_resized = self.sharpen_eye(eye_resized)
                 
-                # Chuẩn hóa histogram một lần nữa
+                # Chuẩn hóa histogram một lần nữa - tối đa hóa độ tương phản
                 eye_resized = cv2.equalizeHist(eye_resized)
 
                 if self.normalize:
                     eye_resized = eye_resized.astype("float32") / 255.0
 
-                eye_resized = np.expand_dims(eye_resized, axis=-1)
+                # (101, 101) -> (101, 101, 1)
+                eye_resized = np.expand_dims(eye_resized, axis=-1) 
                 eyes_crops.append(eye_resized)
 
         return eyes_crops
 
     def preprocess_and_visualize(self, img, save_path=None):
         """
-        Xử lý ảnh:
+        Xử lý ảnh giống detect_eyes nhưng có thêm:
         - Trả về 2 mắt đã chuẩn hóa như trước
         - Vẽ bounding box face và eye lên ảnh gốc, trả về ảnh gốc có khung
         """
-        # img = cv2.imread(img_path)
-        # if img is None:
-        #     raise ValueError(f"Không đọc được ảnh: {img_path}")
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -175,14 +246,14 @@ class Preprocessing:
                 eh_disp = int(eh + 2*pad_y)
                 cv2.rectangle(img_disp, (ex_disp, ey_disp), (ex_disp + ew_disp, ey_disp + eh_disp), (0, 0, 255), 2)
 
-        # Nếu không detect được mắt
+        # Nếu không detect được mắt -> thêm ảnh mắt trống
         if not eyes_crops:
             empty_eye = np.zeros((*self.img_size, 1), dtype=np.float32)
             eyes_crops = [empty_eye, empty_eye]
-        elif len(eyes_crops) == 1:
+        elif len(eyes_crops) == 1: # Chỉ detect được 1 mắt -> [mắt tìm thấy, ảnh đen]
             empty_eye = np.zeros((*self.img_size, 1), dtype=np.float32)
             eyes_crops = [eyes_crops[0], empty_eye]
-        else:
+        else: # Nhiều hơn 2 mắt -> chỉ lấy 2 mắt đầu tiên
             eyes_crops = eyes_crops[:2]
 
         if save_path:

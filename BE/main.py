@@ -1,14 +1,11 @@
 import importlib
-import preprocessing
-importlib.reload(preprocessing)
-from model.model import EyeStateModel
-from preprocessing import Preprocessing
+from utils import EyeStateModel, Preprocessing
 import cv2
 
 pre = Preprocessing(img_size=(101, 101))
 model = EyeStateModel()
 
-model.load("eye_model.h5")
+model.load("D:\BTL_Python_Tr_Hieu\BTLPython\BE\eye_model.h5")
 cap = cv2.VideoCapture(0)
 
 while True:
