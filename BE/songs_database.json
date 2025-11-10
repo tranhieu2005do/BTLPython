@@ -1,0 +1,81 @@
+[
+  {
+    "id": 1,
+    "title": "Chạy Ngay Đi",
+    "artist": "Sơn Tùng M-TP",
+    "filename": "static/music/chay_ngay_di.mp3",
+    "cover": "static/covers/chay_ngay_di.jpg"
+  },
+  {
+    "id": 2,
+    "title": "Lạc Trôi",
+    "artist": "Sơn Tùng M-TP",
+    "filename": "static/music/lac_troi.mp3",
+    "cover": "static/covers/lac_troi.jpg"
+  },
+  {
+    "id": 3,
+    "title": "Nơi Này Có Anh",
+    "artist": "Sơn Tùng M-TP",
+    "filename": "static/music/noi_nay_co_anh.mp3",
+    "cover": "static/covers/noi_nay_co_anh.jpg"
+  },
+  {
+    "id": 4,
+    "title": "Hãy Trao Cho Anh",
+    "artist": "Sơn Tùng M-TP",
+    "filename": "static/music/hay_trao_cho_anh.mp3",
+    "cover": "static/covers/hay_trao_cho_anh.jpg"
+  },
+  {
+    "id": 5,
+    "title": "Em Của Ngày Hôm Qua",
+    "artist": "Sơn Tùng M-TP",
+    "filename": "static/music/em_cua_ngay_hom_qua.mp3",
+    "cover": "static/covers/em_cua_ngay_hom_qua.jpg"
+  },
+  {
+    "id": 6,
+    "title": "Có Chắc Yêu Là Đây",
+    "artist": "Sơn Tùng M-TP",
+    "filename": "static/music/co_chac_yeu_la_day.mp3",
+    "cover": "static/covers/co_chac_yeu_la_day.jpg"
+  },
+  {
+    "id": 7,
+    "title": "Chúng Ta Của Hiện Tại",
+    "artist": "Sơn Tùng M-TP",
+    "filename": "static/music/chung_ta_cua_hien_tai.mp3",
+    "cover": "static/covers/chung_ta_cua_hien_tai.jpg"
+  },
+  {
+    "id": 8,
+    "title": "Muộn Rồi Mà Sao Còn",
+    "artist": "Sơn Tùng M-TP",
+    "filename": "static/music/muon_roi_ma_sao_con.mp3",
+    "cover": "static/covers/muon_roi_ma_sao_con.jpg"
+  },
+  {
+    "id": 9,
+    "title": "Âm thầm bên em",
+    "artist": "Sơn Tùng M-TP",
+    "filename": "static/music/am_tham_ben_em.mp3",
+    "cover": "static/covers/am_tham_ben_em.jpg"
+  },
+  {
+    "id": 10,
+    "title": "Như ngày hôm qua",
+    "artist": "Sơn Tùng M-TP",
+    "filename": "static/music/nhu_ngay_hom_qua.mp3",
+    "cover": "static/covers/nhu_ngay_hom_qua.jpg"
+  },
+  {
+    "id": 11,
+    "title": "Buông đôi tay nhau ra",
+    "artist": "Sơn Tùng MTP",
+    "filename": "/static/music/buong_doi_tay_nhau_ra.mp3",
+    "cover": "/static/covers/buong_doi_tay_nhau_ra.jpg",
+    "upload_date": "2025-11-10T21:50:50.497239",
+    "size": 3617802
+  }
+]
