@@ -4,7 +4,7 @@ from keras.layers import (
     Conv2D, MaxPooling2D, Flatten, Dense, Dropout,
     GlobalAveragePooling2D, Reshape, multiply, Input, BatchNormalization, Activation
 )
-from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 import cv2
 import os
@@ -13,10 +13,16 @@ import os
 def se_block(input_tensor, reduction=16):
     """Squeeze-and-Excitation Block"""
     filters = input_tensor.shape[-1]
+    
+    # Squeeze (Nén): Sử dụng Global Average Pooling
     se = GlobalAveragePooling2D()(input_tensor)
     se = Reshape((1, 1, filters))(se)
+    
+    # Excitation (Kích thích): Sử dụng 2 lớp Dense
     se = Dense(filters // reduction, activation='relu', kernel_initializer='he_normal')(se)
     se = Dense(filters, activation='sigmoid', kernel_initializer='he_normal')(se)
+    
+    # Rescale: Nhân trọng số trở lại
     return multiply([input_tensor, se])
 
 

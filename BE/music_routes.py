@@ -196,47 +196,6 @@ def delete_song(song_id):
         print(f"Delete failed: {e}")
         return jsonify({'status': 'error', 'message': f'Delete failed: {str(e)}'}), 500
 
-def get_file_path_from_url(url_path, default_folder='static'):
-    """
-    Chuyển đổi URL path thành file system path
-    Ví dụ: /static/music/song.mp3 → static/music/song.mp3
-    """
-    if not url_path:
-        return None
-    
-    # Bỏ dấu / đầu tiên nếu có
-    if url_path.startswith('/'):
-        return url_path[1:]
-    
-    # Nếu không có static/ ở đầu, thêm vào
-    if not url_path.startswith('static/'):
-        return os.path.join(default_folder, os.path.basename(url_path))
-    
-    return url_path
-
-@music_bp.route('/api/music/<int:song_id>', methods=['GET'])
-def get_song(song_id):
-    """Lấy thông tin chi tiết một bài hát"""
-    try:
-        songs = load_songs_db()
-        for song in songs:
-            if song['id'] == song_id:
-                return jsonify({
-                    'status': 'success',
-                    'song': song
-                })
-        
-        return jsonify({
-            'status': 'error',
-            'message': 'Song not found'
-        }), 404
-        
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
 @music_bp.route('/api/music/update/<int:song_id>', methods=['PUT'])
 def update_song(song_id):
     """Cập nhật thông tin bài hát"""
@@ -296,3 +255,45 @@ def init_default_songs():
         ]
         save_songs_db(default_songs)
         print("✅ Initialized default songs database")
+
+def get_file_path_from_url(url_path, default_folder='static'):
+    """
+    Chuyển đổi URL path thành file system path
+    Ví dụ: /static/music/song.mp3 → static/music/song.mp3
+    """
+    if not url_path:
+        return None
+    
+    # Bỏ dấu / đầu tiên nếu có
+    if url_path.startswith('/'):
+        return url_path[1:]
+    
+    # Nếu không có static/ ở đầu, thêm vào
+    if not url_path.startswith('static/'):
+        return os.path.join(default_folder, os.path.basename(url_path))
+    
+    return url_path
+
+@music_bp.route('/api/music/<int:song_id>', methods=['GET'])
+def get_song(song_id):
+    """Lấy thông tin chi tiết một bài hát"""
+    try:
+        songs = load_songs_db()
+        for song in songs:
+            if song['id'] == song_id:
+                return jsonify({
+                    'status': 'success',
+                    'song': song
+                })
+        
+        return jsonify({
+            'status': 'error',
+            'message': 'Song not found'
+        }), 404
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+

@@ -12,7 +12,7 @@ import pygame
 
 # Audio
 pygame.mixer.init()
-pygame.mixer.music.load(r"D:\\python_code\\Individual_model\\BTLPYTHON\\BE\\alert.mp3")
+pygame.mixer.music.load(r"D:\New folder\BTLPython\BE\alert.mp3")
 
 def play_warning_music():
     if not pygame.mixer.music.get_busy():
@@ -24,11 +24,15 @@ def stop_warning_music():
 class SystemState:
     def __init__(self):
         self.camera_manager = CameraManager()
-        self.lock = threading.Lock()
+        # Queue cho Thread 1 (Capture) -> Thread 2 (AI)
+        # Kích thước = 1 để thực hiện Frame Dropping
+        self.frame_queue = Queue(maxsize=1) 
         
-        # Queue cho frame processing
-        self.frame_queue = Queue(maxsize=1)  # Giữ tối đa 2 frames
+        # Queue cho Thread 2 (AI) -> Thread 3 (Stream)
         self.result_queue = Queue(maxsize=1)
+        
+        # Cơ chế khóa (Lock) để đồng bộ hóa
+        self.lock = threading.Lock()
         
         # Frame hiển thị
         self.display_frame = None

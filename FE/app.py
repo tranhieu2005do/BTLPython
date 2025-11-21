@@ -30,16 +30,16 @@ from BE.model.eye_model.preprocessing import Preprocessing
 from BE.model.body_model.model import YawnDetectorMAR
 
 # Initialize models
-print("🔧 Initializing AI models...")
+print("Initializing AI models...")
 detector = YawnDetectorMAR()
 pre = Preprocessing(img_size=(101, 101))
 model = EyeStateModel()
-model.load(r"D:\python_code\Individual_model\BTLPYTHON\BE\model\eye_model\eye_model.h5")
-print("✅ Models loaded successfully")
+model.load(r"D:\New folder\BTLPython\BE\model\eye_model\eye_model.h5")
+print("Models loaded successfully")
 
 # Initialize Audio
 pygame.mixer.init()
-pygame.mixer.music.load(r"D:\python_code\Individual_model\BTLPYTHON\BE\alert.mp3")
+pygame.mixer.music.load(r"D:\New folder\BTLPython\BE\alert.mp3")
 print("🔊 Audio system initialized")
 
 def play_warning_music():
@@ -93,18 +93,6 @@ def detection_thread():
     Thread 2: Xử lý detection từ queue
     Phân tích eye closure và yawn detection theo custom rules
     """
-    print("🔍 Detection thread started")
-    
-    print("=" * 60)
-    print("CUSTOM DROWSINESS DETECTION RULES")
-    print("=" * 60)
-    print(f"Rule 1: Eyes closed continuously for {state.CONTINUOUS_CLOSURE_THRESHOLD}s → ALERT")
-    print(f"Rule 2: {state.YAWN_THRESHOLD} yawns within {state.YAWN_WINDOW}s (60s) → ALERT")
-    print("=" * 60)
-    
-    fps_counter = 0
-    fps_start = time.time()
-    
     while True:
         try:
             # Lấy frame từ queue
@@ -112,7 +100,13 @@ def detection_thread():
                 time.sleep(0.001)
                 continue
                 
-            current_time, frame = state.frame_queue.get()
+            # Lấy frame MỚI NHẤT
+            current_time, frame = state.frame_queue.get() 
+            
+            # Vứt bỏ TẤT CẢ các frame cũ đã bị ứ đọng
+            while not state.frame_queue.empty():
+                # Lấy và bỏ qua
+                current_time, frame = state.frame_queue.get()
             
             # === DỰ ĐOÁN NGÁP ===
             _, yawn_label, mar = detector.predict_frame(frame)
@@ -142,7 +136,7 @@ def detection_thread():
             if both_eyes_closed:
                 if state.eye_closure_start_time is None:
                     state.eye_closure_start_time = current_time
-                    print(f"👁 Eyes closed at {time.strftime('%H:%M:%S')}")
+                    # print(f"👁 Eyes closed at {time.strftime('%H:%M:%S')}")
                 
                 state.current_closure_duration = current_time - state.eye_closure_start_time
                 
@@ -313,3 +307,4 @@ if __name__ == '__main__':
     print("=" * 60)
     
     app.run(debug=False, host='0.0.0.0', port=5000, threaded=True)
+

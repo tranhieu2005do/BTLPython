@@ -1,1 +1,3 @@
 BE/data/
+.venv/
+__pycache__/
